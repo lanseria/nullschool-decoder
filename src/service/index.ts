@@ -1,38 +1,43 @@
-import * as moment from 'moment';
-const typeMap = {
-  风: 'wind-surface-level-gfs',
-  温度: 'temp-surface-level-gfs',
-  相对湿度: 'relative_humidity-surface-level-gfs',
-  三小时降水量: 'precip_3hr-gfs',
-  CAPE: 'cape-gfs',
-  水汽含量: 'total_precipitable_water-gfs',
-  云中总水量: 'total_cloud_water-gfs',
-  MSLP: 'mean_sea_level_pressure-gfs',
-  体感温度: 'misery_index-gfs'
-}
-const VERSION = '0.5'
+import got from 'got'
+import * as fs from 'fs'
+import * as stream from "stream";
+import { promisify } from "util";
+import { urlWrapper, getDate } from '../utils';
+import { decodeEpak, toArrayBuffer } from '../utils/decodeEpak';
 
-type TypeMap = typeof typeMap
-type TypeKey = keyof TypeMap
-const urlWrapper = (time: string, type: TypeKey) => {
-  const typeValue = typeMap[type]
-  return `https://gaia.nullschool.net/data/gfs/${time}00-${typeValue}-${VERSION}.epak`
-}
+let grib2json = require('weacast-grib2json')
+
+
+const pipeline = promisify(stream.pipeline);
+let wstream: fs.WriteStream = undefined;
+
 const app = {
-  start() {
-    const time = this.getDate()
+  async start() {
+    const time = getDate()
     const url = urlWrapper(time, '风')
     console.log(url)
+    await pipeline(
+      got.stream(url),
+      (wstream = fs.createWriteStream(`log/data/epak/demo.epak`))
+    )
+    wstream.end();
+    console.log('download finish')
+    // const data = fs.readFileSync("log/data/epak/gfs.grib");
+    // const epak = decodeEpak(toArrayBuffer(data));
+    // const jpak = JSON.stringify(epak);
+    // const jpakBlocks = JSON.stringify(epak.blocks);
+    // fs.writeFile('log/data/json/jpak.json', jpak, function () { });
+    // fs.writeFile('log/data/json/jpakBlocks.json', jpakBlocks, function () { });
+    // console.log('json finish')
+    try {
+      const _json = await grib2json('log/data/epak/2020011818.f000', {
+        data: true,
+        output: 'log/data/json/data.json'
+      })
+    } catch (error) {
+      console.log(error)
+    }
   },
-  getDate(date: Date = new Date()) {
-    const yearMonthDay = moment(date).utcOffset(0).format('YYYY/MM/DD/')
-    return yearMonthDay + this.gfsHour(date)
-  },
-  gfsHour(date: Date = new Date()) {
-    const hour = String(Math.floor(moment(date).utcOffset(0).hour() / 3) * 3)
-    return hour.padStart(2, '0')
-    // return Math.floor(date.getHours() / 3) * 3;
-  }
 }
 
 export default app
