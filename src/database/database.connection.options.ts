@@ -1,9 +1,7 @@
 import { ConnectionOptions } from "typeorm";
 import { join } from "path";
-
-import * as dotenv from 'dotenv'
-dotenv.config()
-
+import initConfig from '../config'
+initConfig()
 const parentDir = join(__dirname, "..");
 const connectionOpts: ConnectionOptions = {
   type: "postgres",
